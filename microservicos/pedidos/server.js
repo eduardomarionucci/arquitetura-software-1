@@ -3,189 +3,86 @@ const axios = require("axios");
 const db = require("./db");
 
 const app = express();
-
-const PRODUTOS_URL =
-    process.env.PRODUTOS_URL || "http://localhost:3001";
-
+const PRODUTOS_URL = process.env.PRODUTOS_URL || "http://localhost:3001";
+const CLIENTES_URL = process.env.CLIENTES_URL || "http://localhost:3003";
 app.use(express.json());
-
-const pedidos = [];
-
-/*app.get("/pedidos", (req, res) => {
-    res.json(pedidos);
-});*/
 
 app.get("/pedidos", async (req, res) => {
     try {
-        const resultado = await db.query(
-            "SELECT * FROM pedidos ORDER BY id"
-        );
-
+        const resultado = await db.query("SELECT * FROM pedidos ORDER BY id");
         res.json(resultado.rows);
     } catch (erro) {
-        res.status(500).json({
-            erro: "Erro ao buscar pedidos"
-        });
+        res.status(500).json({ erro: "Erro ao buscar pedidos" });
     }
 });
-
-/*app.post("/pedidos", async (req, res) => {
-    const { produtoId, quantidade } = req.body;
-
-    if (!produtoId || !quantidade || quantidade <= 0) {
-        return res.status(400).json({
-            erro: "produtoId e quantidade válida são obrigatórios"
-        });
-    }
-
-    try {
-        const resposta = await axios.get(
-            `${PRODUTOS_URL}/produtos/${produtoId}`,
-            {
-                timeout: 3000
-            }
-        );
-
-        const produto = resposta.data;
-
-        const pedido = {
-            id: pedidos.length + 1,
-            produto,
-            quantidade,
-            total: produto.preco * quantidade
-        };
-
-        pedidos.push(pedido);
-
-        res.status(201).json(pedido);
-    } catch (erro) {
-        if (erro.response?.status === 404) {
-            return res.status(400).json({
-                erro: "Produto não encontrado"
-            });
-        }
-
-        return res.status(503).json({
-            erro: "Serviço de Produtos indisponível"
-        });
-    }
-});*/
 
 app.post("/pedidos", async (req, res) => {
-    const { produtoId, quantidade } = req.body;
-
-    if (!produtoId || !quantidade || quantidade <= 0) {
-        return res.status(400).json({
-            erro: "produtoId e quantidade válida são obrigatórios"
-        });
+    const { cliente_id, produtoId, quantidade } = req.body || {};
+    const inteiroValido = valor => Number.isInteger(valor) && valor > 0 && valor <= 2147483647;
+    if (![cliente_id, produtoId, quantidade].every(inteiroValido)) {
+        return res.status(400).json({ erro: "cliente_id, produtoId e quantidade devem ser inteiros positivos" });
     }
-
     try {
-        const resposta = await axios.get(
-            `${PRODUTOS_URL}/produtos/${produtoId}`,
-            {
-                timeout: 3000
-            }
-        );
-
-        const produto = resposta.data;
-        const total = produto.preco * quantidade;
-
-        const resultado = await db.query(
-            `INSERT INTO pedidos (
-        produto_id,
-        nome_produto,
-        preco_unitario,
-        quantidade,
-        total
-      )
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING *`,
-            [
-                produto.id,
-                produto.nome,
-                produto.preco,
-                quantidade,
-                total
-            ]
-        );
-
-        res.status(201).json(resultado.rows[0]);
+        await axios.get(`${CLIENTES_URL}/clientes/${cliente_id}`, { timeout: 3000 });
     } catch (erro) {
         if (erro.response?.status === 404) {
-            return res.status(400).json({
-                erro: "Produto não encontrado"
-            });
+            return res.status(400).json({ erro: "Cliente não encontrado" });
         }
-
-        if (erro.code === "ECONNREFUSED" || erro.code === "ECONNABORTED") {
-            return res.status(503).json({
-                erro: "Serviço de Produtos indisponível"
-            });
+        return res.status(503).json({ erro: "Serviço de Clientes indisponível" });
+    }
+    let produto;
+    try {
+        const resposta = await axios.get(`${PRODUTOS_URL}/produtos/${produtoId}`, { timeout: 3000 });
+        produto = resposta.data;
+    } catch (erro) {
+        if (erro.response?.status === 404) {
+            return res.status(400).json({ erro: "Produto não encontrado" });
         }
-
-        return res.status(500).json({
-            erro: "Erro ao criar pedido"
-        });
+        return res.status(503).json({ erro: "Serviço de Produtos indisponível" });
     }
-});
-
-/*app.get("/pedidos/:id", (req, res) => {
-    const pedido = pedidos.find(
-        p => p.id === Number(req.params.id)
-    );
-
-    if (!pedido) {
-        return res.status(404).json({
-            erro: "Pedido não encontrado"
-        });
-    }
-
-    res.json(pedido);
-});*/
-
-app.get("/pedidos/:id", async (req, res) => {
     try {
         const resultado = await db.query(
-            "SELECT * FROM pedidos WHERE id = $1",
-            [req.params.id]
+            `INSERT INTO pedidos (cliente_id, produto_id, nome_produto, preco_unitario, quantidade, total)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+            [cliente_id, produto.id, produto.nome, produto.preco, quantidade, produto.preco * quantidade]
         );
-
-        const pedido = resultado.rows[0];
-
-        if (!pedido) {
-            return res.status(404).json({
-                erro: "Pedido não encontrado"
-            });
-        }
-
-        res.json(pedido);
+        res.status(201).json(resultado.rows[0]);
     } catch (erro) {
-        res.status(500).json({
-            erro: "Erro ao buscar pedido"
-        });
+        res.status(500).json({ erro: "Erro ao criar pedido" });
     }
 });
 
-app.use(express.json());
+app.get("/pedidos/:id", async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0 || id > 2147483647) {
+        return res.status(400).json({ erro: "ID inválido" });
+    }
+    try {
+        const resultado = await db.query("SELECT * FROM pedidos WHERE id = $1", [id]);
+        if (!resultado.rows[0]) {
+            return res.status(404).json({ erro: "Pedido não encontrado" });
+        }
+        res.json(resultado.rows[0]);
+    } catch (erro) {
+        res.status(500).json({ erro: "Erro ao buscar pedido" });
+    }
+});
 
-async function criarTabela() {
-    await db.query(`
-        CREATE TABLE IF NOT EXISTS pedidos (
+async function iniciar() {
+    await db.query(`CREATE TABLE IF NOT EXISTS pedidos (
         id SERIAL PRIMARY KEY,
+        cliente_id INTEGER NOT NULL,
         produto_id INTEGER NOT NULL,
         nome_produto VARCHAR(100) NOT NULL,
         preco_unitario NUMERIC(10, 2) NOT NULL,
         quantidade INTEGER NOT NULL,
         total NUMERIC(10, 2) NOT NULL
-        )
-    `);
-
-    console.log("Tabela de pedidos pronta");
+    )`);
+    await db.query("ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS cliente_id INTEGER");
+    app.listen(3002, () => console.log("Pedidos rodando na porta 3002"));
 }
 
-criarTabela();
-
-app.listen(3002, () => {
-    console.log("Pedidos rodando na porta 3002");
+iniciar().catch(erro => {
+    console.error("Erro ao iniciar Pedidos:", erro.message);
+    process.exit(1);
 });

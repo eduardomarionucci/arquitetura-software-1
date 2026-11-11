@@ -1,0 +1,39 @@
+meta {
+  name: Criar pedido
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/pedidos
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "cliente_id": {{cliente_id}},
+    "produtoId": {{produto_id}},
+    "quantidade": 3
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setVar("pedido_id", res.getBody().id);
+  }
+}
+
+tests {
+  test("Status 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Validar resposta", function () {
+    expect(res.getBody().cliente_id).to.equal(Number(bru.getVar("cliente_id")));
+    expect(Number(res.getBody().total)).to.equal(30);
+  });
+}

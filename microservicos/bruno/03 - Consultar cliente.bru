@@ -1,0 +1,20 @@
+meta {
+  name: Consultar cliente
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/clientes/{{cliente_id}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("Status 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Validar resposta", function () {
+    expect(res.getBody().id).to.equal(Number(bru.getVar("cliente_id")));
+  });
+}

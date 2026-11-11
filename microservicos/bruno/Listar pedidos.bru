@@ -1,0 +1,23 @@
+meta {
+  name: Listar pedidos
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/pedidos
+  body: none
+  auth: none
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    bru.setVar("total_pedidos", res.getBody().length);
+  }
+}
+
+tests {
+  test("Status 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

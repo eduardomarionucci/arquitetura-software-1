@@ -1,0 +1,48 @@
+meta {
+  name: Cadastrar cliente
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/clientes
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nome": "Carlos",
+    "sobrenome": "Oliveira",
+    "telefone": "46991112222",
+    "email": "{{email_cliente}}"
+  }
+}
+
+vars:pre-request {
+  email_cliente: eduardo@mail.com
+}
+
+script:pre-request {
+  bru.setVar("email_cliente", "bruno." + Date.now() + "." + Math.random().toString(36).slice(2) + "@example.com");
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setVar("cliente_id", res.getBody().id);
+  }
+}
+
+tests {
+  test("Status 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Validar resposta", function () {
+    expect(res.getBody().id).to.be.a("number");
+    expect(res.getBody().email).to.equal(bru.getVar("email_cliente"));
+  });
+}

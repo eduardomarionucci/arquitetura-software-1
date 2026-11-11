@@ -1,0 +1,17 @@
+meta {
+  name: Cliente inexistente
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/clientes/2147483647
+  body: none
+  auth: none
+}
+
+tests {
+  test("Status 404", function () {
+    expect(res.getStatus()).to.equal(404);
+  });
+}

@@ -1,0 +1,34 @@
+meta {
+  name: Cadastrar produto
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/produtos
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nome": "Produto Bruno",
+    "preco": 10
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setVar("produto_id", res.getBody().id);
+  }
+}
+
+tests {
+  test("Status 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
